@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+
+  db:
+    container_name: container_db
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=zabbix
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix
+      - MYSQL_DATABASE=zabbix
+    ports:
+      - "3306:3306"
+    networks:
+      - net
+
+  zabbix:
+    container_name: container_zabbix_server
+    image: zabbix/zabbix-server-mysql:ubuntu-latest
+    ports:
+      - "10051:10051"
+    depends_on:
+      - db
+    environment:
+      - DB_SERVER_HOST=container_db
+      - DB_SERVER_PORT=3306
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix
+      - MYSQL_ROOT_PASSWORD=zabbix
+    networks:
+      - net
+
+  front:
+    container_name: container_front
+    image: zabbix/zabbix-web-apache-mysql:ubuntu-latest
+    ports:
+      - "8081:8080"
+      - "8443:8443"
+    depends_on:
+      - db
+      - zabbix
+    environment:
+      - ZBX_SERVER_HOST=container_zabbix_server
+      - ZBX_SERVER_PORT=10051
+      - DB_SERVER_HOST=container_db
+      - DB_SERVER_PORT=3306
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix
+      - MYSQL_ROOT_PASSWORD=zabbix
+    networks:
+      - net
+
+networks:
+  net: {}

@@ -1,0 +1,21 @@
+---
+- hosts: localhost
+  tasks: 
+    - name: Docker install
+      become: yes
+      become_user: root
+      apt:
+        name: ['docker.io', 'docker-compose']
+        state: present
+        force_apt_get: yes
+
+- hosts: localhost 
+  tasks:
+    - name: Docker-compose execution
+      become: yes
+      become_user: root
+      docker_compose:
+        project_src: /tmp/floppy-files
+        files:
+          - "docker-compose.yml"
+        state: present
