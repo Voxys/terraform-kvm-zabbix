@@ -6,8 +6,18 @@ resource "libvirt_volume" "ubuntu_volume" {
   format = "qcow2"
 }
 
+resource "libvirt_volume" "volume" {
+  name = "volume-ubuntu"
+  base_volume_id = "${libvirt_volume.ubuntu_volume.id}"
+  size = 10737418240 # 10GB
+}
+
 data "template_file" "user_data" {
-  template = file("${path.module}/cloud_init.cfg")
+  template   = file("${path.module}/cloud_init.cfg.tftpl")
+  vars       = {
+    username   = var.username,
+    public_key = file(var.public_key_path),
+  }
 }
 
 resource "libvirt_cloudinit_disk" "commoninit" {
@@ -29,7 +39,7 @@ resource "libvirt_domain" "ubuntu" {
   }
 
   disk {
-    volume_id = libvirt_volume.ubuntu_volume.id
+    volume_id = libvirt_volume.volume.id
   }
 
   console {
@@ -45,7 +55,7 @@ resource "libvirt_domain" "ubuntu" {
   }
 
   provisioner "local-exec" {
-    command = "scp -qo StrictHostKeyChecking=no -i ${var.private_key_path} -r ./floppy-files user@${libvirt_domain.ubuntu.network_interface.0.addresses.0}:/tmp"
+    command = "scp -qo StrictHostKeyChecking=no -O -i ${var.private_key_path} -r ./floppy-files ${var.username}@${libvirt_domain.ubuntu.network_interface.0.addresses.0}:/tmp"
   }
 
   provisioner "remote-exec" {
@@ -53,12 +63,16 @@ resource "libvirt_domain" "ubuntu" {
       host        = libvirt_domain.ubuntu.network_interface.0.addresses.0
       agent       = true
       type        = "ssh"
-      user        = "user"
+      user        = var.username
       private_key = file(var.private_key_path)
     }
 
-   inline = ["sudo apt-add-repository ppa:ansible/ansible -y","sudo apt update","sudo apt install ansible -y","sudo ansible-playbook /tmp/scripts/playbook.yml"]
+    inline = ["sudo apt-add-repository ppa:ansible/ansible -y","sudo apt update","sudo apt install ansible -y","sudo ansible-playbook /tmp/floppy-files/playbook.yml"]
   }
+
+  depends_on = [
+    libvirt_volume.volume
+  ]
 }
 
 output "vm_ip_address"  {
